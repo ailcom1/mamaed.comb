@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>واجهة مع زر هدية</title>
+    <meta name="package-name" content="com.DollarChat">
     <style>
         body {
             margin: 0; 
@@ -15,6 +16,7 @@
             flex-direction: column;
             justify-content: flex-end;
             height: 100vh;
+            touch-action: pan-y; /* منع التكبير أو التصغير */
         }
         
         .bottom-bar {
@@ -59,22 +61,47 @@
             transform: scale(1.1);
         }
 
+        .send-btn img {
+            width: 24px;
+            height: 24px;
+        }
+
         #messageArea {
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* الحفاظ على الترتيب الطبيعي للرسائل */
             height: 200px;
-            overflow-y: auto;
-            padding: 10px;
+            overflow-y: auto; /* يمكن التمرير للأعلى */
+            position: relative;
+            padding: 10px; /* إضافة حواف */
         }
 
         #messageArea p {
+            position: relative;
+            opacity: 0;
+            transform: translateY(20px); /* جعل الرسائل تبدأ من أسفل */
+            animation: slideIn 0.5s forwards;
+            margin: 5px 0;
+            align-self: flex-end; /* محاذاة الرسائل إلى اليمين */
             background-color: #1a1a2e;
             padding: 10px;
             border-radius: 15px;
             max-width: 60%;
-            margin: 5px 0;
+            font-size: 14px;
             text-align: right; /* محاذاة النص إلى اليمين */
+            transition: transform 0.5s ease;
         }
+
+        @keyframes slideIn {
+            0% {
+                opacity: 0;
+                transform: translateY(20px); /* بداية من أسفل */
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0); /* تصل إلى مكانها الطبيعي */
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -83,59 +110,81 @@
 
     <div class="bottom-bar">
         <input type="text" class="message-input" placeholder="اكتب رسالتك هنا...">
-        <button class="send-btn">إرسال</button>
+        <button class="send-btn">
+            <img src="https://img.icons8.com/ios-filled/50/ffffff/telegram-app.png" alt="Send">
+        </button>
     </div>
 
     <script type="module">
-        // استيراد المكتبات من Firebase
+        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-        import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-database.js";
+        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
 
-        // إعدادات مشروع Firebase
+        // Your web app's Firebase configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyCD0prU8j_l9CVnGf70SlprW1YiOulqXm4",
-            authDomain: "ailments.firebaseapp.com",
-            databaseURL: "https://ailments-default-rtdb.firebaseio.com/", // تأكد من صحة هذا الرابط
-            projectId: "ailments",
-            storageBucket: "ailments.appspot.com",
-            messagingSenderId: "734289175251",
-            appId: "1:734289175251:web:c087643ab931b515e92a26",
-            measurementId: "G-Z35S0GXEQ5"
+            apiKey: "AIzaSyCiMc6ozqGVxbY4Rn7gbvSNSnNrYA97rzs",
+            authDomain: "vbnmlk-ded10.firebaseapp.com",
+            projectId: "vbnmlk-ded10",
+            storageBucket: "vbnmlk-ded10.appspot.com",
+            messagingSenderId: "355587025",
+            appId: "1:355587025:web:741d27941684e95b2e06f0",
+            measurementId: "G-H05W812C9Z"
         };
 
-        // تهيئة Firebase
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
+        const db = getFirestore(app);
 
         const sendBtn = document.querySelector('.send-btn');
         const messageInput = document.querySelector('.message-input');
+        const messageArea = document.getElementById('messageArea');
 
         sendBtn.addEventListener('click', () => {
-            const messageText = messageInput.value.trim();
-            if (messageText) {
-                const messagesRef = ref(database, 'messages');
-                const newMessageRef = push(messagesRef);
-                set(newMessageRef, {
-                    text: messageText,
-                    timestamp: Date.now()
-                });
-                messageInput.value = ''; // مسح حقل الإدخال
+            sendMessage();
+        });
+
+        // إرسال الرسالة عند الضغط على زر "Enter"
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
             }
         });
 
-        // قراءة الرسائل من قاعدة البيانات
-        const messagesRef = ref(database, 'messages');
-        onValue(messagesRef, (snapshot) => {
-            const messages = snapshot.val();
-            const messageArea = document.getElementById('messageArea');
-            messageArea.innerHTML = ''; // مسح الرسائل السابقة
+        function sendMessage() {
+            const messageText = messageInput.value.trim();
 
-            for (let id in messages) {
-                const message = messages[id];
-                const messageElement = document.createElement('p');
-                messageElement.innerText = message.text;
-                messageArea.appendChild(messageElement);
+            if (messageText) {
+                // إضافة الرسالة إلى قاعدة البيانات
+                addDoc(collection(db, "messages"), {
+                    text: messageText,
+                    timestamp: new Date()
+                });
+                messageInput.value = ''; // مسح حقل الإدخال بعد الإرسال
+                messageInput.focus(); // إعادة التركيز على حقل الإدخال
             }
+        }
+
+        // الاستماع للرسائل الجديدة
+        onSnapshot(collection(db, "messages"), (snapshot) => {
+            messageArea.innerHTML = ''; // مسح الرسائل الحالية
+            snapshot.forEach(doc => {
+                const messageData = doc.data();
+                const messageElement = document.createElement('p');
+                messageElement.innerText = messageData.text;
+                messageArea.appendChild(messageElement);
+
+                // تطبيق الرسوم المتحركة
+                messageElement.style.animation = `slideIn 0.5s forwards`;
+
+                // تمرير الرسائل للأعلى
+                const oldMessages = messageArea.children;
+                if (oldMessages.length > 1) {
+                    for (let i = 0; i < oldMessages.length; i++) {
+                        oldMessages[i].style.transform = `translateY(-${(i + 1) * 10}px)`; // رفع الرسائل القديمة
+                    }
+                }
+            });
+            messageArea.scrollTop = messageArea.scrollHeight; // التمرير لأسفل عند إضافة رسالة جديدة
         });
     </script>
 </body>
